@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};

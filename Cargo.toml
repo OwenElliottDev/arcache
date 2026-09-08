@@ -13,11 +13,11 @@ categories = ["caching", "data-structures", "algorithms"]
 [dependencies]
 linked-hash-map = "0.5"
 linked_hash_set = "0.1"
-rand = "0.9"
+rand = "0.10"
 
 
 [dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports"] }
+criterion = { version = "0.8.2", features = ["html_reports"] }
 
 [[bench]]
 name = "lru_bench"

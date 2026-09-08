@@ -1,5 +1,6 @@
 use arcache::{Cache, FIFOCache, LFUCache, LIFOCache, LRUCache, MRUCache, RandomReplacementCache};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 
 // cache factory type
 type BenchCacheFactory = (&'static str, Box<dyn Fn() -> Box<dyn Cache<i32, i32>>>);
