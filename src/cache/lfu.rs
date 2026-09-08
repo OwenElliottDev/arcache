@@ -33,13 +33,15 @@ impl<K: Eq + Hash + Clone + Sync + Send, V: Send + Sync> LFUCacheInner<K, V> {
     fn increase_freq(&mut self, key: &K) {
         let freq = *self.counter.get(key).unwrap_or(&0);
         *self.counter.entry(key.clone()).or_default() += 1;
-        self.freq_map.entry(freq).or_default().remove(key);
 
-        if !self.freq_map.contains_key(&freq) {
-            if freq == self.min_freq {
-                self.min_freq += 1;
+        if let Some(bucket) = self.freq_map.get_mut(&freq) {
+            bucket.remove(key);
+            if bucket.is_empty() {
+                self.freq_map.remove(&freq);
+                if freq == self.min_freq {
+                    self.min_freq += 1;
+                }
             }
-            self.freq_map.remove(&freq);
         }
         self.freq_map
             .entry(freq + 1)
@@ -137,19 +139,17 @@ impl<K: Eq + Hash + Clone + Sync + Send, V: Send + Sync> Cache<K, V> for LFUCach
         let mut inner = self.inner.lock().unwrap();
 
         let result = inner.key_value_map.remove(key);
-        // if let Some(_) = result {
-        //     inner.counter.remove(key);
-        //     inner.freq_map.get_mut(&1).map(|bucket| bucket.remove(key));
-        // }
 
         if result.is_some() {
-            inner.counter.remove(key);
-            let freq = *inner.counter.get(key).unwrap_or(&0);
-            if let Some(bucket) = inner.freq_map.get_mut(&freq) {
-                bucket.remove(key);
-                if bucket.is_empty() {
-                    inner.freq_map.remove(&1);
-                    inner.min_freq = 0;
+            if let Some(freq) = inner.counter.remove(key) {
+                if let Some(bucket) = inner.freq_map.get_mut(&freq) {
+                    bucket.remove(key);
+                    if bucket.is_empty() {
+                        inner.freq_map.remove(&freq);
+                        if freq == inner.min_freq {
+                            inner.min_freq = inner.freq_map.keys().min().copied().unwrap_or(0);
+                        }
+                    }
                 }
             }
         }
@@ -243,5 +243,42 @@ mod tests {
         assert_eq!(stats.misses, 1);
         assert_eq!(stats.size, 2);
         assert_eq!(stats.capacity, 2);
+    }
+
+    #[test]
+    fn test_lfu_evicts_after_all_keys_promoted() {
+        let cache = LFUCache::new(2);
+        cache.set(1, 1);
+        cache.set(2, 2);
+        cache.get(&1);
+        cache.get(&2);
+        cache.set(3, 3);
+        assert_eq!(cache.stats().size, 2);
+    }
+
+    #[test]
+    fn test_lfu_remove_then_insert_does_not_overflow() {
+        let cache = LFUCache::new(2);
+        cache.set(1, 1);
+        cache.set(2, 2);
+        cache.remove(&1);
+        cache.set(3, 3);
+        cache.get(&3);
+        cache.set(4, 4);
+        assert_eq!(cache.stats().size, 2);
+    }
+
+    #[test]
+    fn test_lfu_remove_then_eviction_picks_least_frequent() {
+        let cache = LFUCache::new(2);
+        cache.set(1, 1);
+        cache.get(&1);
+        cache.set(2, 2);
+        cache.remove(&2);
+        cache.set(3, 3);
+        cache.set(4, 4);
+        assert_eq!(cache.get(&1).map(|v| *v), Some(1));
+        assert_eq!(cache.get(&3), None);
+        assert_eq!(cache.stats().size, 2);
     }
 }
