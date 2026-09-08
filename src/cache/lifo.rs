@@ -77,14 +77,17 @@ impl<K: Eq + Hash + Clone + Sync + Send, V: Send + Sync> Cache<K, V> for LIFOCac
     /// Set a value in the cache.
     fn set(&self, key: K, value: V) -> Option<Arc<V>> {
         let mut inner = self.inner.lock().unwrap();
-        if inner.key_value_map.len() as u64 >= inner.capacity {
+        let is_new = !inner.key_value_map.contains_key(&key);
+        if is_new && inner.key_value_map.len() as u64 >= inner.capacity {
             if let Some(oldest_key) = inner.lifo.pop() {
                 inner.key_value_map.remove(&oldest_key);
             }
         }
         let arc_value = Arc::new(value);
         let result = inner.key_value_map.insert(key.clone(), arc_value);
-        inner.lifo.push(key);
+        if is_new {
+            inner.lifo.push(key);
+        }
         result
     }
 
@@ -173,5 +176,28 @@ mod tests {
         cache.change_capacity(1);
         assert_eq!(cache.get(&2), None);
         assert_eq!(cache.get(&1).map(|v| *v), Some(1));
+    }
+
+    #[test]
+    fn test_lifo_overwrite_when_full_keeps_other_keys() {
+        let cache = LIFOCache::new(2);
+        cache.set(1, 1);
+        cache.set(2, 2);
+        cache.set(1, 10);
+        assert_eq!(cache.get(&2).map(|v| *v), Some(2));
+        assert_eq!(cache.get(&1).map(|v| *v), Some(10));
+        assert_eq!(cache.stats().size, 2);
+    }
+
+    #[test]
+    fn test_lifo_repeated_overwrite_does_not_exceed_capacity() {
+        let cache = LIFOCache::new(2);
+        for _ in 0..5 {
+            cache.set(1, 1);
+        }
+        cache.set(2, 2);
+        cache.set(3, 3);
+        cache.set(4, 4);
+        assert!(cache.stats().size <= 2);
     }
 }
