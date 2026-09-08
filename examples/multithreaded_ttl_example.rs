@@ -1,6 +1,6 @@
 use arcache::{Cache, TTLCache};
 use rand::rng;
-use rand::{seq::SliceRandom, Rng};
+use rand::{seq::SliceRandom, RngExt};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
