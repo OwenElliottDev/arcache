@@ -13,7 +13,7 @@ categories = ["caching", "data-structures", "algorithms"]
 [dependencies]
 linked-hash-map = "0.5"
 linked_hash_set = "0.1"
-rand = "0.9"
+rand = "0.10"
 
 
 [dev-dependencies]
